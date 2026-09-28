@@ -27,10 +27,12 @@ export async function withUserContext<T>(
 }
 
 export async function upsertUser(user: { id: string; username?: string; firstName?: string }) {
-  await pool.query(
-    `INSERT INTO users (id, username, first_name)
-     VALUES ($1, $2, $3)
-     ON CONFLICT (id) DO UPDATE SET username = EXCLUDED.username, first_name = EXCLUDED.first_name`,
-    [user.id, user.username ?? null, user.firstName ?? null]
+  await withUserContext(user.id, (client) =>
+    client.query(
+      `INSERT INTO users (id, username, first_name)
+       VALUES ($1, $2, $3)
+       ON CONFLICT (id) DO UPDATE SET username = EXCLUDED.username, first_name = EXCLUDED.first_name`,
+      [user.id, user.username ?? null, user.firstName ?? null]
+    )
   );
 }

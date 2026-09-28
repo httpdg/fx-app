@@ -5,6 +5,8 @@ import path from 'node:path';
 import { config } from './config';
 import { verifyTelegramInitData, signSession, verifySession } from './auth';
 import { upsertUser } from './db';
+import { startScheduler } from './scheduler';
+import { getRecentSignals } from './signals';
 
 const app = Fastify({ logger: true });
 const SESSION_COOKIE = 'session';
@@ -56,6 +58,15 @@ app.get('/api/me', async (req, reply) => {
   return { ok: true, userId };
 });
 
+app.get('/api/signals', async (req, reply) => {
+  const userId = verifySession(req.cookies[SESSION_COOKIE]);
+  if (!userId) {
+    return reply.code(401).send({ ok: false });
+  }
+  const signals = await getRecentSignals(30);
+  return { ok: true, signals };
+});
+
 // Всё, что не /api, отдаём как SPA — фронт сам разберётся с маршрутом.
 app.setNotFoundHandler((req, reply) => {
   if (req.raw.url?.startsWith('/api')) {
@@ -65,7 +76,9 @@ app.setNotFoundHandler((req, reply) => {
   reply.sendFile('index.html');
 });
 
-app.listen({ port: config.port, host: '0.0.0.0' }).catch((err) => {
-  app.log.error(err);
-  process.exit(1);
-});
+app.listen({ port: config.port, host: '0.0.0.0' })
+  .then(() => startScheduler())
+  .catch((err) => {
+    app.log.error(err);
+    process.exit(1);
+  });

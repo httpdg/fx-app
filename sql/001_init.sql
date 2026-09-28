@@ -7,6 +7,7 @@ CREATE TABLE IF NOT EXISTS users (
   first_name TEXT,
   created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
+
 ALTER TABLE users ENABLE ROW LEVEL SECURITY;
 ALTER TABLE users FORCE ROW LEVEL SECURITY;
 
@@ -40,7 +41,7 @@ CREATE POLICY user_settings_owner ON user_settings
 DO $$
 BEGIN
   IF NOT EXISTS (SELECT FROM pg_roles WHERE rolname = 'app_user') THEN
-    CREATE ROLE app_user LOGIN PASSWORD 'rootbaby';
+    CREATE ROLE app_user LOGIN PASSWORD 'ЗАМЕНИ_НА_СВОЙ_ПАРОЛЬ';
   END IF;
 END
 $$;
