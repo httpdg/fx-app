@@ -7,6 +7,13 @@ CREATE TABLE IF NOT EXISTS users (
   first_name TEXT,
   created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
+ALTER TABLE users ENABLE ROW LEVEL SECURITY;
+ALTER TABLE users FORCE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS users_owner ON users;
+CREATE POLICY users_owner ON users
+  USING (id = current_setting('app.current_user_id', true)::bigint)
+  WITH CHECK (id = current_setting('app.current_user_id', true)::bigint);
 
 -- Пример таблицы с данными, привязанными к юзеру.
 -- Каждая следующая таблица с личными данными делается по этому же образцу.
@@ -33,7 +40,7 @@ CREATE POLICY user_settings_owner ON user_settings
 DO $$
 BEGIN
   IF NOT EXISTS (SELECT FROM pg_roles WHERE rolname = 'app_user') THEN
-    CREATE ROLE app_user LOGIN PASSWORD 'ЗАМЕНИ_НА_СВОЙ_ПАРОЛЬ';
+    CREATE ROLE app_user LOGIN PASSWORD 'rootbaby';
   END IF;
 END
 $$;
