@@ -34,3 +34,19 @@ export async function fetchCandles(pair: string, count = 30): Promise<Candle[]> 
     }))
     .reverse();
 }
+
+// https://api.twelvedata.com/price?symbol=EUR/USD&apikey=...
+export async function fetchPrice(pair: string): Promise<number> {
+  const url = new URL('https://api.twelvedata.com/price');
+  url.searchParams.set('symbol', pair);
+  url.searchParams.set('apikey', config.twelveDataApiKey ?? '');
+
+  const res = await fetch(url);
+  const data = (await res.json()) as any;
+
+  if (data.status === 'error' || data.price === undefined) {
+    throw new Error(`Twelve Data не отдал цену для ${pair}: ${data.message ?? 'неизвестная ошибка'}`);
+  }
+
+  return Number(data.price);
+}

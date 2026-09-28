@@ -6,7 +6,13 @@ interface SignalItem {
   pair: string;
   direction: 'up' | 'down';
   reasoning: string | null;
+  result: 'hit' | 'miss' | null;
   created_at: string;
+}
+
+interface Stats {
+  hits: number;
+  total: number;
 }
 
 function relativeTime(iso: string): string {
@@ -18,8 +24,15 @@ function relativeTime(iso: string): string {
   return `${minutes} минут назад`;
 }
 
+function statusLabel(result: 'hit' | 'miss' | null): string {
+  if (result === 'hit') return 'Сбылся';
+  if (result === 'miss') return 'Не сбылся';
+  return 'Ждём итога';
+}
+
 export function Signals() {
   const [signals, setSignals] = useState<SignalItem[] | null>(null);
+  const [stats, setStats] = useState<Stats | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -29,7 +42,10 @@ export function Signals() {
         const res = await fetch('/api/signals', { credentials: 'include' });
         if (!res.ok) return;
         const data = await res.json();
-        if (!cancelled) setSignals(data.signals);
+        if (!cancelled) {
+          setSignals(data.signals);
+          setStats(data.stats);
+        }
       } catch {
         // тихо пропускаем — при следующем опросе попробуем снова
       }
@@ -47,18 +63,20 @@ export function Signals() {
     return <div className="screen" />;
   }
 
-  if (signals.length === 0) {
-    return (
-      <div className="screen">
+  return (
+    <div className="screen" style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-3)' }}>
+      {stats && stats.total > 0 && (
+        <p className="empty-state">
+          {stats.hits} из {stats.total} сбылось за последние завершённые сигналы
+        </p>
+      )}
+
+      {signals.length === 0 && (
         <Card>
           <p className="empty-state">Пока нет сигналов. Первый появится в течение пяти минут.</p>
         </Card>
-      </div>
-    );
-  }
+      )}
 
-  return (
-    <div className="screen" style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-3)' }}>
       {signals.map((s) => (
         <Card key={s.id}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
@@ -70,9 +88,17 @@ export function Signals() {
               {s.reasoning}
             </p>
           )}
-          <p className="empty-state" style={{ marginTop: 'var(--space-2)', fontSize: 12 }}>
-            {relativeTime(s.created_at)}
-          </p>
+          <div
+            style={{
+              marginTop: 'var(--space-2)',
+              display: 'flex',
+              justifyContent: 'space-between',
+              fontSize: 12
+            }}
+          >
+            <span className="empty-state">{relativeTime(s.created_at)}</span>
+            <span className="empty-state">{statusLabel(s.result)}</span>
+          </div>
         </Card>
       ))}
     </div>

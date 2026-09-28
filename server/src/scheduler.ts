@@ -1,7 +1,7 @@
 import { config } from './config';
-import { fetchCandles } from './market';
+import { fetchCandles, fetchPrice } from './market';
 import { analyzePair } from './model';
-import { getEnabledPairs, getLastSignalAt, insertSignal } from './signals';
+import { getDueSignals, getEnabledPairs, getLastSignalAt, insertSignal, resolveSignal } from './signals';
 
 const CHECK_INTERVAL_MS = 30_000;
 
@@ -17,12 +17,33 @@ export function startScheduler() {
 
 async function tick() {
   try {
+    await resolveDueSignals();
+  } catch (err) {
+    console.error('Ошибка при подведении итогов сигналов:', err);
+  }
+
+  try {
     const pairs = await getEnabledPairs();
     for (const pair of pairs) {
       await maybeGenerateSignal(pair);
     }
   } catch (err) {
     console.error('Ошибка в планировщике сигналов:', err);
+  }
+}
+
+async function resolveDueSignals() {
+  const due = await getDueSignals();
+  for (const signal of due) {
+    try {
+      const exitPrice = await fetchPrice(signal.pair);
+      const entryPrice = Number(signal.entry_price);
+      const hit = signal.direction === 'up' ? exitPrice > entryPrice : exitPrice < entryPrice;
+      await resolveSignal(signal.id, exitPrice, hit ? 'hit' : 'miss');
+      console.log(`Итог ${signal.pair} #${signal.id}: ${hit ? 'сбылся' : 'не сбылся'}`);
+    } catch (err) {
+      console.error(`Не удалось подвести итог сигнала #${signal.id}:`, err);
+    }
   }
 }
 
@@ -36,8 +57,15 @@ async function maybeGenerateSignal(pair: string) {
   try {
     const candles = await fetchCandles(pair);
     const result = await analyzePair(pair, candles);
-    await insertSignal(pair, result.direction, config.signalHorizonSeconds, result.reasoning);
-    console.log(`Сигнал ${pair}: ${result.direction}`);
+    const entryPrice = candles[candles.length - 1].close;
+    await insertSignal({
+      pair,
+      direction: result.direction,
+      horizonSeconds: config.signalHorizonSeconds,
+      reasoning: result.reasoning,
+      entryPrice
+    });
+    console.log(`Сигнал ${pair}: ${result.direction} по цене ${entryPrice}`);
   } catch (err) {
     console.error(`Не удалось сгенерировать сигнал для ${pair}:`, err);
   }
